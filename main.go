@@ -18,14 +18,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-type handlers struct {
-	handler Handler
-}
-
-type Handler interface {
-	Handle() gin.HandlerFunc
-}
-
 func main() {
 	// read command-line args
 	var prod bool
@@ -64,21 +56,96 @@ func main() {
 	service := service.New(store)
 	handler := handler.New(service)
 	handlers := handlers{
-		handler: handler,
+		auth:          handler,
+		onlyLeaders:   handler,
+		createGroup:   handler,
+		readAllGroups: handler,
+		readGroup:     handler,
+		updateGroup:   handler,
+		deleteGroup:   handler,
+		readMembers:   handler,
+		addMember:     handler,
+		deleteMember:  handler,
+		readLeaders:   handler,
+		addLeader:     handler,
+		deleteLeader:  handler,
 	}
 
 	// run http server
-	r := gin.Default()
-	users := r.Group("/api/v0/groups")
+	server := gin.Default()
+	api := server.Group("/api/v0/groups", handlers.auth.AuthMiddleware())
 	{
-		public := users.Group("")
+		api.POST("/", handlers.createGroup.CreateGroupHandler())
+		api.GET("/", handlers.readAllGroups.ReadAllGroupsHandler())
+		api.GET("/:id", handlers.readGroup.ReadGroupHandler())
+		api.GET("/:id/members", handlers.readMembers.ReadMembersHandler())
+		api.GET("/:id/leaders", handlers.readLeaders.ReadLeadersHandler())
+
+		forLeaders := api.Group("", handlers.onlyLeaders.OnlyLeadersMiddleware())
 		{
-			public.POST("/", handlers.handler.Handle())
-		}
-		auth := users.Group("", handlers.handler.Handle())
-		{
-			auth.GET("/:id", handlers.handler.Handle())
+			forLeaders.PUT("/:id", handlers.updateGroup.UpdateGroupHandler())
+			forLeaders.DELETE("/:id", handlers.deleteGroup.DeleteGroupHandler())
+			forLeaders.POST("/:id/members", handlers.addMember.AddMemberHandler())
+			forLeaders.DELETE(":gid/members/:mid", handlers.deleteMember.DeleteMemberHandler())
+			forLeaders.POST("/:id/leaders", handlers.addLeader.AddLeadersHandler())
+			forLeaders.DELETE(":gid/leaders/:lid", handlers.deleteLeader.DeleteLeaderHandler())
 		}
 	}
-	r.Run(fmt.Sprintf("0.0.0.0:%s", port))
+	server.Run(fmt.Sprintf("0.0.0.0:%s", port))
+}
+
+type handlers struct {
+	auth          AuthMiddleware
+	onlyLeaders   OnlyLeadersMiddleware
+	createGroup   CreateGroupHandler
+	readAllGroups ReadAllGroupsHandler
+	readGroup     ReadGroupHandler
+	updateGroup   UpdateGroupHandler
+	deleteGroup   DeleteGroupHandler
+	readMembers   ReadMembersHandler
+	addMember     AddMemberHandler
+	deleteMember  DeleteMemberHandler
+	readLeaders   ReadLeadersHandler
+	addLeader     AddLeadersHandler
+	deleteLeader  DeleteLeaderHandler
+}
+
+type AuthMiddleware interface {
+	AuthMiddleware() gin.HandlerFunc
+}
+type OnlyLeadersMiddleware interface {
+	OnlyLeadersMiddleware() gin.HandlerFunc
+}
+type CreateGroupHandler interface {
+	CreateGroupHandler() gin.HandlerFunc
+}
+type ReadAllGroupsHandler interface {
+	ReadAllGroupsHandler() gin.HandlerFunc
+}
+type ReadGroupHandler interface {
+	ReadGroupHandler() gin.HandlerFunc
+}
+type UpdateGroupHandler interface {
+	UpdateGroupHandler() gin.HandlerFunc
+}
+type DeleteGroupHandler interface {
+	DeleteGroupHandler() gin.HandlerFunc
+}
+type ReadMembersHandler interface {
+	ReadMembersHandler() gin.HandlerFunc
+}
+type AddMemberHandler interface {
+	AddMemberHandler() gin.HandlerFunc
+}
+type DeleteMemberHandler interface {
+	DeleteMemberHandler() gin.HandlerFunc
+}
+type ReadLeadersHandler interface {
+	ReadLeadersHandler() gin.HandlerFunc
+}
+type AddLeadersHandler interface {
+	AddLeadersHandler() gin.HandlerFunc
+}
+type DeleteLeaderHandler interface {
+	DeleteLeaderHandler() gin.HandlerFunc
 }
