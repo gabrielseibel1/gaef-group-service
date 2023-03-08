@@ -1,3 +1,6 @@
+.env
+gaef-group-service
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
